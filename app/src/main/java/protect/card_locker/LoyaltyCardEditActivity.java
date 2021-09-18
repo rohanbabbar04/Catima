@@ -668,6 +668,12 @@ public class LoyaltyCardEditActivity extends CatimaAppCompatActivity
     }
 
     protected static void setCardImage(ImageView imageView, Bitmap bitmap) {
+        if (bitmap != null) {
+            Toast.makeText(imageView.getContext(), imageView.getId() + "\n\n" + bitmap.getAllocationByteCount(), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(imageView.getContext(), imageView.getId() + "\n\n" + "null", Toast.LENGTH_LONG).show();
+        }
+
         imageView.setTag(bitmap);
 
         if (bitmap != null) {
@@ -845,7 +851,17 @@ public class LoyaltyCardEditActivity extends CatimaAppCompatActivity
             cardOptions.put(getString(R.string.addFromImage), () -> {
                 Intent i = new Intent(Intent.ACTION_PICK);
                 i.setType("image/*");
-                startActivityForResult(i, v.getId() == ID_IMAGE_FRONT ? Utils.CARD_IMAGE_FROM_FILE_FRONT : Utils.CARD_IMAGE_FROM_FILE_BACK);
+                // FIXME: START DEBUG
+                new AlertDialog.Builder(LoyaltyCardEditActivity.this)
+                        .setTitle("Before startActivityForResult intent")
+                        .setMessage(i.toString())
+                        .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                startActivityForResult(i, v.getId() == ID_IMAGE_FRONT ? Utils.CARD_IMAGE_FROM_FILE_FRONT : Utils.CARD_IMAGE_FROM_FILE_BACK);
+                            }
+                        }).show();
+                // FIXME: END DEBUG
                 return null;
             });
 
@@ -1062,59 +1078,69 @@ public class LoyaltyCardEditActivity extends CatimaAppCompatActivity
     {
         super.onActivityResult(requestCode, resultCode, intent);
 
-        if (resultCode == RESULT_OK) {
-            if (requestCode == Utils.CARD_IMAGE_FROM_CAMERA_FRONT || requestCode == Utils.CARD_IMAGE_FROM_CAMERA_BACK) {
-                Bitmap bitmap = BitmapFactory.decodeFile(tempCameraPicturePath);
+        // FIXME: START DEBUG
+        new AlertDialog.Builder(LoyaltyCardEditActivity.this)
+                .setTitle("Before startActivityForResult intent")
+                .setMessage(requestCode + "\n\n" + resultCode + "\n\n" + intent.toString())
+                .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (resultCode == RESULT_OK) {
+                            if (requestCode == Utils.CARD_IMAGE_FROM_CAMERA_FRONT || requestCode == Utils.CARD_IMAGE_FROM_CAMERA_BACK) {
+                                Bitmap bitmap = BitmapFactory.decodeFile(tempCameraPicturePath);
 
-                if (bitmap != null) {
-                    bitmap = Utils.resizeBitmap(bitmap);
-                    try {
-                        bitmap = Utils.rotateBitmap(bitmap, new ExifInterface(tempCameraPicturePath));
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                                if (bitmap != null) {
+                                    bitmap = Utils.resizeBitmap(bitmap);
+                                    try {
+                                        bitmap = Utils.rotateBitmap(bitmap, new ExifInterface(tempCameraPicturePath));
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+
+                                    if (requestCode == Utils.CARD_IMAGE_FROM_CAMERA_FRONT) {
+                                        setCardImage(cardImageFront, bitmap);
+                                    } else {
+                                        setCardImage(cardImageBack, bitmap);
+                                    }
+
+                                    hasChanged = true;
+                                } else {
+                                    Toast.makeText(LoyaltyCardEditActivity.this, R.string.errorReadingImage, Toast.LENGTH_LONG).show();
+                                }
+                            } else if (requestCode == Utils.CARD_IMAGE_FROM_FILE_FRONT || requestCode == Utils.CARD_IMAGE_FROM_FILE_BACK) {
+                                Bitmap bitmap = null;
+                                try {
+                                    bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), intent.getData());
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Error getting data from image file");
+                                    e.printStackTrace();
+                                }
+
+                                if (bitmap != null) {
+                                    bitmap = Utils.resizeBitmap(bitmap);
+                                    if (requestCode == Utils.CARD_IMAGE_FROM_FILE_FRONT) {
+                                        setCardImage(cardImageFront, bitmap);
+                                    } else {
+                                        setCardImage(cardImageBack, bitmap);
+                                    }
+
+                                    hasChanged = true;
+                                } else {
+                                    Toast.makeText(LoyaltyCardEditActivity.this, R.string.errorReadingImage, Toast.LENGTH_LONG).show();
+                                }
+                            } else {
+                                BarcodeValues barcodeValues = Utils.parseSetBarcodeActivityResult(requestCode, resultCode, intent, LoyaltyCardEditActivity.this);
+
+                                cardId = barcodeValues.content();
+                                barcodeType = barcodeValues.format();
+                                barcodeId = "";
+                            }
+                        }
+
+                        onResume();
                     }
-
-                    if (requestCode == Utils.CARD_IMAGE_FROM_CAMERA_FRONT) {
-                        setCardImage(cardImageFront, bitmap);
-                    } else {
-                        setCardImage(cardImageBack, bitmap);
-                    }
-
-                    hasChanged = true;
-                } else {
-                    Toast.makeText(this, R.string.errorReadingImage, Toast.LENGTH_LONG).show();
-                }
-            } else if (requestCode == Utils.CARD_IMAGE_FROM_FILE_FRONT || requestCode == Utils.CARD_IMAGE_FROM_FILE_BACK) {
-                Bitmap bitmap = null;
-                try {
-                    bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), intent.getData());
-                } catch (IOException e) {
-                    Log.e(TAG, "Error getting data from image file");
-                    e.printStackTrace();
-                }
-
-                if (bitmap != null) {
-                    bitmap = Utils.resizeBitmap(bitmap);
-                    if (requestCode == Utils.CARD_IMAGE_FROM_FILE_FRONT) {
-                        setCardImage(cardImageFront, bitmap);
-                    } else {
-                        setCardImage(cardImageBack, bitmap);
-                    }
-
-                    hasChanged = true;
-                } else {
-                    Toast.makeText(this, R.string.errorReadingImage, Toast.LENGTH_LONG).show();
-                }
-            } else {
-                BarcodeValues barcodeValues = Utils.parseSetBarcodeActivityResult(requestCode, resultCode, intent, this);
-
-                cardId = barcodeValues.content();
-                barcodeType = barcodeValues.format();
-                barcodeId = "";
-            }
-        }
-
-        onResume();
+                }).show();
+        // FIXME: END DEBUG
     }
 
     private void showBarcode() {
